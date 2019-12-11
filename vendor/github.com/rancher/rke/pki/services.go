@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/rancher/rke/hosts"
 	"github.com/rancher/rke/log"
@@ -371,8 +372,16 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 	}
 	sort.Strings(ips)
 
+	delEtcdCerts := make(map[string]bool)
+	for k, _ := range certs {
+		if strings.Contains(k, "kube-etcd") {
+			delEtcdCerts[k] = true
+		}
+	}
+
 	for _, host := range etcdHosts {
 		etcdName := GetCrtNameForHost(host, EtcdCertName)
+		delete(delEtcdCerts, etcdName)
 		if _, ok := certs[etcdName]; ok && certs[etcdName].CertificatePEM != "" && !rotate {
 			cert := certs[etcdName].Certificate
 			if cert != nil && len(dnsNames) == len(cert.DNSNames) && len(ips) == len(cert.IPAddresses) {
@@ -402,6 +411,10 @@ func GenerateEtcdCertificates(ctx context.Context, certs map[string]CertificateP
 			return err
 		}
 		certs[etcdName] = ToCertObject(etcdName, "", "", etcdCrt, etcdKey, nil)
+
+	}
+	for k, _ := range delEtcdCerts {
+		delete(certs, k)
 	}
 	return nil
 }
