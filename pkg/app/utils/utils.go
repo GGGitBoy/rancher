@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, clusterName, appTargetNamespace string) (string, error) {
+func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, clusterName, appTargetNamespace, creatorID string) (string, error) {
 	// detect Namespace
 	deployNamespace, err := userNSClient.Get(appTargetNamespace, metav1.GetOptions{})
 	if err != nil && !kerrors.IsNotFound(err) {
@@ -33,7 +33,8 @@ func EnsureAppProjectName(userNSClient v1.NamespaceInterface, ownedProjectID, cl
 	} else {
 		deployNamespace = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: appTargetNamespace,
+				Name:        appTargetNamespace,
+				Annotations: map[string]string{"field.cattle.io/creatorId": creatorID},
 			},
 		}
 

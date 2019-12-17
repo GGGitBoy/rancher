@@ -157,12 +157,13 @@ func (ch *clusterHandler) doSync(cluster *mgmtv3.Cluster) error {
 }
 
 func (ch *clusterHandler) ensureAppProjectName(clusterID, appTargetNamespace string) (string, error) {
+	creator, err := ch.app.systemAccountManager.GetSystemUser(ch.clusterName)
 	appDeployProjectID, err := utils.GetSystemProjectID(clusterID, ch.app.projectLister)
 	if err != nil {
 		return "", err
 	}
 
-	appProjectName, err := utils.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace)
+	appProjectName, err := utils.EnsureAppProjectName(ch.app.agentNamespaceClient, appDeployProjectID, clusterID, appTargetNamespace, creator.Name)
 	if err != nil {
 		return "", err
 	}
