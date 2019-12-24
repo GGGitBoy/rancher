@@ -43,11 +43,12 @@ const (
 	appLevelLabelKey           = cattleMonitoringLabelKey + "/level"
 
 	// The names of App
-	systemLevelAppName              = "monitoring-operator"
-	clusterLevelAppName             = "cluster-monitoring"
-	projectLevelAppName             = "project-monitoring"
-	clusterLevelAlertManagerAppName = "cluster-alerting"
-	IstioAppName                    = "cluster-istio"
+	systemLevelAppName                 = "monitoring-operator"
+	clusterLevelAppName                = "cluster-monitoring"
+	projectLevelAppName                = "project-monitoring"
+	clusterLevelAlertManagerAppName    = "cluster-alerting"
+	clusterLevelWebhookReceiverAppName = "test-webhook"
+	IstioAppName                       = "cluster-istio"
 
 	// The headless service name of Prometheus
 	alertManagerHeadlessServiceName = "alertmanager-operated"
@@ -140,6 +141,10 @@ func ClusterMonitoringInfo() (appName, appTargetNamespace string) {
 
 func ClusterAlertManagerInfo() (appName, appTargetNamespace string) {
 	return clusterLevelAlertManagerAppName, cattleNamespaceName
+}
+
+func ClusterWebhookReceiverInfo() (appName, appTargetNamespace string) {
+	return clusterLevelWebhookReceiverAppName, cattleNamespaceName
 }
 
 func ProjectMonitoringInfo(projectName string) (appName, appTargetNamespace string) {

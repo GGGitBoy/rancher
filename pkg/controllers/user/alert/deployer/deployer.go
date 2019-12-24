@@ -20,6 +20,7 @@ import (
 	projectv3 "github.com/rancher/types/apis/project.cattle.io/v3"
 	"github.com/rancher/types/config"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -98,6 +99,9 @@ func (d *Deployer) ClusterRuleSync(key string, alert *mgmtv3.ClusterAlertRule) (
 // //deploy or clean up resources(alertmanager deployment, service, namespace) required by alerting.
 func (d *Deployer) sync() error {
 	appName, appTargetNamespace := monitorutil.ClusterAlertManagerInfo()
+	webhookapp, webhookTargetNamespace := monitorutil.ClusterWebhookReceiverInfo()
+
+	logrus.Info("====  jiandao  webhookTargetNamespace %s :  %s ======= ", webhookapp, webhookTargetNamespace)
 
 	systemProject, err := projectutil.GetSystemProject(d.clusterName, d.projectLister)
 	if err != nil {
@@ -139,6 +143,11 @@ func (d *Deployer) sync() error {
 				return fmt.Errorf("get cluster %s failed, %v", d.clusterName, err)
 			}
 			newCluster = cluster.DeepCopy()
+		}
+
+		logrus.Info("====  jiandao  alertManager ======= ")
+		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(webhookapp, webhookTargetNamespace, systemProjectID); err != nil {
+			return fmt.Errorf("===== jiandao  test failed ====== %v", err)
 		}
 
 		if d.alertManager.IsDeploy, err = d.appDeployer.deploy(appName, appTargetNamespace, systemProjectID); err != nil {
