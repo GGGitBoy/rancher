@@ -101,7 +101,7 @@ func (d *Deployer) sync() error {
 	appName, appTargetNamespace := monitorutil.ClusterAlertManagerInfo()
 	webhookapp, webhookTargetNamespace := monitorutil.ClusterWebhookReceiverInfo()
 
-	logrus.Info("====  jiandao  webhookTargetNamespace %s :  %s ======= ", webhookapp, webhookTargetNamespace)
+	logrus.Info("====  jiandao  webhookTargetNamespace %s======= ", webhookapp)
 
 	systemProject, err := projectutil.GetSystemProject(d.clusterName, d.projectLister)
 	if err != nil {
