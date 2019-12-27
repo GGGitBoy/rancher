@@ -32,6 +32,7 @@ import (
 var (
 	creatorIDAnn       = "field.cattle.io/creatorId"
 	systemProjectLabel = map[string]string{"authz.management.cattle.io/system-project": "true"}
+	webhookName        = "webhook-receiver"
 )
 
 type Deployer struct {
@@ -229,6 +230,10 @@ func (d *appDeployer) cleanup(appName, appTargetNamespace, systemProjectID strin
 	})
 
 	errgrp.Go(func() error {
+		return d.appsGetter.Apps(systemProjectName).Delete(webhookName, &metav1.DeleteOptions{})
+	})
+
+	errgrp.Go(func() error {
 		secretName := alertutil.GetAlertManagerSecretName(appName)
 		return d.secrets.DeleteNamespaced(appTargetNamespace, secretName, &metav1.DeleteOptions{})
 	})
@@ -329,6 +334,31 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 	}
 	if _, err := d.appsGetter.Apps(systemProjectName).Create(app); err != nil && !apierrors.IsAlreadyExists(err) {
 		return false, fmt.Errorf("failed to create %q App, %v", appName, err)
+	}
+
+	webhookApp, err := d.appsGetter.Apps(systemProjectName).Get(webhookName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, fmt.Errorf("failed to query %q App in %s Project, %v", webhookName, systemProjectName, err)
+	}
+
+	webhookApp = &projectv3.App{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				creatorIDAnn: creator.Name,
+			},
+			Labels:    monitorutil.OwnedLabels(webhookName, appTargetNamespace, systemProjectID, monitorutil.SystemLevel),
+			Name:      webhookName,
+			Namespace: systemProjectName,
+		},
+		Spec: projectv3.AppSpec{
+			Description:     "Webhook for Rancher alertmanager",
+			ExternalID:      "catalog://?catalog=demo&template=webhook-receiver&version=0.1.0",
+			ProjectName:     systemProjectID,
+			TargetNamespace: appTargetNamespace,
+		},
+	}
+	if _, err := d.appsGetter.Apps(systemProjectName).Create(webhookApp); err != nil && !apierrors.IsAlreadyExists(err) {
+		return false, fmt.Errorf("failed to create %q App, %v", webhookName, err)
 	}
 
 	return true, nil
