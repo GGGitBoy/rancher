@@ -23,7 +23,7 @@ const (
 	libraryBranch = "master"
 	libraryName   = "library"
 
-	systemLibraryURL    = "https://git.rancher.io/system-charts"
+	systemLibraryURL    = "https://github.com/GGGitBoy/system-charts"
 	systemLibraryBranch = "master"
 	systemLibraryName   = "system-library"
 	defSystemChartVer   = "management.cattle.io/default-system-chart-version"
