@@ -292,7 +292,7 @@ func TestMicrosoft(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dial
 		msg = "Microsoft setting validated"
 	}
 
-	content := `{"text":` + msg + `}`
+	content := `{"text":"` + msg + `"}`
 
 	client, err := NewClientFromConfig(cfg, dialer)
 	if err != nil {
