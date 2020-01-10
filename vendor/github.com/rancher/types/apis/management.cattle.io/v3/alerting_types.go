@@ -62,7 +62,7 @@ type ProjectAlertSpec struct {
 type Recipient struct {
 	Recipient    string `json:"recipient,omitempty"`
 	NotifierName string `json:"notifierName,omitempty" norman:"required,type=reference[notifier]"`
-	NotifierType string `json:"notifierType,omitempty" norman:"required,options=slack|email|pagerduty|webhook|wechat|dingtalk"`
+	NotifierType string `json:"notifierType,omitempty" norman:"required,options=slack|email|pagerduty|webhook|wechat|dingtalk|microsoft"`
 }
 
 type TargetNode struct {
@@ -269,6 +269,7 @@ type NotifierSpec struct {
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty"`
 	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty"`
 	DingtalkConfig  *DingtalkConfig  `json:"dingtalkConfig,omitempty"`
+	MicrosoftConfig *MicrosoftConfig `json:"microsoftConfig,omitempty"`
 }
 
 type Notification struct {
@@ -279,6 +280,7 @@ type Notification struct {
 	WebhookConfig   *WebhookConfig   `json:"webhookConfig,omitempty"`
 	WechatConfig    *WechatConfig    `json:"wechatConfig,omitempty"`
 	DingtalkConfig  *DingtalkConfig  `json:"dingtalkConfig,omitempty"`
+	MicrosoftConfig *MicrosoftConfig `json:"microsoftConfig,omitempty"`
 }
 
 type SMTPConfig struct {
@@ -310,6 +312,11 @@ type WebhookConfig struct {
 type DingtalkConfig struct {
 	URL    string `json:"url,omitempty" norman:"required"`
 	Secret string `json:"secret,omitempty" norman:"type=password,required"`
+	*HTTPClientConfig
+}
+
+type MicrosoftConfig struct {
+	URL string `json:"url,omitempty" norman:"required"`
 	*HTTPClientConfig
 }
 
