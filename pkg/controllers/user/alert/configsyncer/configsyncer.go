@@ -574,6 +574,32 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 				receiver.WebhookConfigs = append(receiver.WebhookConfigs, dingtalk)
 				receiverExist = true
 
+			} else if notifier.Spec.MicrosoftConfig != nil {
+
+				app.Spec.Answers[webhookProviders+".microsoft-"+r.NotifierName+".webhook_url"] = notifier.Spec.MicrosoftConfig.URL
+				app.Spec.Answers[webhookReceivers+"."+r.NotifierName+".provider"] = "microsoft-" + r.NotifierName
+				d.apps.Update(app)
+
+				webhookURL := "http://webhook-receiver.cattle-prometheus.svc.cluster.local:9094/" + r.NotifierName
+				microsoft := &alertconfig.WebhookConfig{
+					NotifierConfig: commonNotifierConfig,
+					URL:            webhookURL,
+				}
+
+				if notifier.Spec.MicrosoftConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.MicrosoftConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse microsoft proxy url %s, %v", notifier.Spec.MicrosoftConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					microsoft.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
+				}
+
+				receiver.WebhookConfigs = append(receiver.WebhookConfigs, microsoft)
+				receiverExist = true
+
 			} else if notifier.Spec.SlackConfig != nil {
 				slack := &alertconfig.SlackConfig{
 					NotifierConfig: commonNotifierConfig,
