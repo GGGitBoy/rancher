@@ -35,6 +35,9 @@ var (
 	eventGroupInterval  = 1
 	eventGroupWait      = 1
 	eventRepeatInterval = 525600
+
+	webhookProviders = "webhook-receiver.config.providers"
+	webhookReceivers = "webhook-receiver.config.receivers"
 )
 
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
@@ -195,11 +198,14 @@ func (d *ConfigSyncer) sync() error {
 	config := manager.GetAlertManagerDefaultConfig()
 	config.Global.PagerdutyURL = "https://events.pagerduty.com/v2/enqueue"
 
-	if err = d.addClusterAlert2Config(config, cAlertsMap, cAlertsKey, cAlertGroupsMap, notifiers); err != nil {
+	appName, _ := monitorutil.ClusterAlertManagerInfo()
+	app, err := d.apps.GetNamespaced(systemProjectName, appName, metav1.GetOptions{})
+
+	if err = d.addClusterAlert2Config(config, cAlertsMap, cAlertsKey, cAlertGroupsMap, notifiers, app); err != nil {
 		return err
 	}
 
-	if err = d.addProjectAlert2Config(config, pAlertsMap, pAlertsKey, pAlertGroupsMap, notifiers); err != nil {
+	if err = d.addProjectAlert2Config(config, pAlertsMap, pAlertsKey, pAlertGroupsMap, notifiers, app); err != nil {
 		return err
 	}
 
@@ -311,7 +317,7 @@ func (d *ConfigSyncer) addClusterAlert2Operator(clusterDisplayName string, group
 	return nil
 }
 
-func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string, alertGroups map[string]*v3.ProjectAlertGroup, notifiers []*v3.Notifier) error {
+func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projectGroups map[string]map[string][]*v3.ProjectAlertRule, keys []string, alertGroups map[string]*v3.ProjectAlertGroup, notifiers []*v3.Notifier, app *projectv3.App) error {
 	for _, projectName := range keys {
 		groups := projectGroups[projectName]
 		var groupIDs []string
@@ -329,7 +335,7 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 
 			receiver := &alertconfig.Receiver{Name: groupID}
 
-			exist := d.addRecipients(notifiers, receiver, group.Spec.Recipients)
+			exist := d.addRecipients(notifiers, receiver, group.Spec.Recipients, app)
 
 			if exist {
 				config.Receivers = append(config.Receivers, receiver)
@@ -356,7 +362,7 @@ func (d *ConfigSyncer) addProjectAlert2Config(config *alertconfig.Config, projec
 	return nil
 }
 
-func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts map[string][]*v3.ClusterAlertRule, keys []string, alertGroups map[string]*v3.ClusterAlertGroup, notifiers []*v3.Notifier) error {
+func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts map[string][]*v3.ClusterAlertRule, keys []string, alertGroups map[string]*v3.ClusterAlertGroup, notifiers []*v3.Notifier, app *projectv3.App) error {
 	for _, groupID := range keys {
 		groupRules := alerts[groupID]
 		receiver := &alertconfig.Receiver{Name: groupID}
@@ -366,7 +372,7 @@ func (d *ConfigSyncer) addClusterAlert2Config(config *alertconfig.Config, alerts
 			return fmt.Errorf("get cluster alert group %s failed", groupID)
 		}
 
-		exist := d.addRecipients(notifiers, receiver, group.Spec.Recipients)
+		exist := d.addRecipients(notifiers, receiver, group.Spec.Recipients, app)
 
 		if exist {
 			config.Receivers = append(config.Receivers, receiver)
@@ -446,7 +452,7 @@ func (d *ConfigSyncer) appendRoute(route *alertconfig.Route, subRoute *alertconf
 	route.Routes = append(route.Routes, subRoute)
 }
 
-func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertconfig.Receiver, recipients []v3.Recipient) bool {
+func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertconfig.Receiver, recipients []v3.Recipient, app *projectv3.App) bool {
 	receiverExist := false
 	for _, r := range recipients {
 		if r.NotifierName != "" {
@@ -540,6 +546,34 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 				receiver.WebhookConfigs = append(receiver.WebhookConfigs, webhook)
 				receiverExist = true
+
+			} else if notifier.Spec.DingtalkConfig != nil {
+
+				app.Spec.Answers[webhookProviders+".dingtalk-"+r.NotifierName+".webhook_url"] = notifier.Spec.DingtalkConfig.URL
+				app.Spec.Answers[webhookProviders+".dingtalk-"+r.NotifierName+".secret"] = notifier.Spec.DingtalkConfig.Secret
+				app.Spec.Answers[webhookReceivers+"."+r.NotifierName+".provider"] = "dingtalk-" + r.NotifierName
+				d.apps.Update(app)
+
+				webhookURL := "http://webhook-receiver.cattle-prometheus.svc.cluster.local:9094/" + r.NotifierName
+				dingtalk := &alertconfig.WebhookConfig{
+					NotifierConfig: commonNotifierConfig,
+					URL:            webhookURL,
+				}
+
+				if notifier.Spec.DingtalkConfig.HTTPClientConfig != nil {
+					url, err := toAlertManagerURL(notifier.Spec.DingtalkConfig.HTTPClientConfig.ProxyURL)
+					if err != nil {
+						logrus.Errorf("Failed to parse dingtalk proxy url %s, %v", notifier.Spec.DingtalkConfig.HTTPClientConfig.ProxyURL, err)
+						continue
+					}
+					dingtalk.HTTPConfig = &alertconfig.HTTPClientConfig{
+						ProxyURL: *url,
+					}
+				}
+
+				receiver.WebhookConfigs = append(receiver.WebhookConfigs, dingtalk)
+				receiverExist = true
+
 			} else if notifier.Spec.SlackConfig != nil {
 				slack := &alertconfig.SlackConfig{
 					NotifierConfig: commonNotifierConfig,
