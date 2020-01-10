@@ -79,6 +79,10 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 		return TestDingtalk(notifier.Spec.DingtalkConfig.URL, notifier.Spec.DingtalkConfig.Secret, msg.Content, notifier.Spec.DingtalkConfig.HTTPClientConfig, dialer)
 	}
 
+	if notifier.Spec.MicrosoftConfig != nil {
+		return TestMicrosoft(notifier.Spec.MicrosoftConfig.URL, msg.Content, notifier.Spec.MicrosoftConfig.HTTPClientConfig, dialer)
+	}
+
 	return errors.New("Notifier not configured")
 }
 
@@ -258,6 +262,37 @@ func TestDingtalk(url, secret, msg string, cfg *v3.HTTPClientConfig, dialer dial
 	}`
 
 	url = getDingtalkURL(url, secret)
+
+	client, err := NewClientFromConfig(cfg, dialer)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentTypeJSON)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func TestMicrosoft(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+	if msg == "" {
+		msg = "Microsoft setting validated"
+	}
+
+	content := `{"text":"` + msg + `"}`
 
 	client, err := NewClientFromConfig(cfg, dialer)
 	if err != nil {
