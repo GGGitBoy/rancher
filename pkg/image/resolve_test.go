@@ -274,7 +274,7 @@ func cloneTestSystemChart(t *testing.T) string {
 	gitCloneCmd := exec.CommandContext(ctx, "git", "clone",
 		"--branch", testSystemChartBranch,
 		"--single-branch",
-		"https://github.com/rancher/system-charts.git",
+		"https://github.com/GGGitBoy/system-charts.git",
 		tempDir,
 	)
 	fmt.Printf("Cloning system charts (branch: %s) into %s\n", testSystemChartBranch, tempDir)
