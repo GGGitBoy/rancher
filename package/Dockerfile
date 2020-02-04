@@ -13,9 +13,9 @@ WORKDIR /var/lib/rancher
 
 ARG ARCH=amd64
 ARG IMAGE_REPO=rancher
-ARG SYSTEM_CHART_DEFAULT_BRANCH=dev
-# kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG RANCHER_METADATA_BRANCH=dev-v2.4
+ARG SYSTEM_CHART_DEFAULT_BRANCH=webhook-test
+# kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go  
+ARG RANCHER_METADATA_BRANCH=
 
 ENV CATTLE_SYSTEM_CHART_DEFAULT_BRANCH=$SYSTEM_CHART_DEFAULT_BRANCH
 ENV CATTLE_HELM_VERSION v2.14.3-rancher1
@@ -32,7 +32,7 @@ ENV RANCHER_METADATA_BRANCH ${RANCHER_METADATA_BRANCH}
 
 RUN mkdir -p /var/lib/rancher-data/local-catalogs/system-library && \
     mkdir -p /var/lib/rancher-data/local-catalogs/library && \
-    git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --single-branch https://github.com/rancher/system-charts /var/lib/rancher-data/local-catalogs/system-library && \
+    git clone -b $CATTLE_SYSTEM_CHART_DEFAULT_BRANCH --single-branch https://github.com/GGGitBoy/system-charts /var/lib/rancher-data/local-catalogs/system-library && \
     git clone -b master --single-branch https://github.com/rancher/charts /var/lib/rancher-data/local-catalogs/library
 
 
@@ -101,7 +101,7 @@ ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
 ARG VERSION=dev
-ENV CATTLE_SERVER_VERSION ${VERSION}
+ENV CATTLE_SERVER_VERSION dev
 COPY entrypoint.sh rancher /usr/bin/
 COPY jailer.sh /usr/bin/
 RUN chmod +x /usr/bin/entrypoint.sh
