@@ -320,7 +320,6 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 				"alertmanager.enabledRBAC":            "false",
 				"alertmanager.configFromSecret":       secret.Name,
 				"operator.enabled":                    "false",
-				"webhook-receiver.enabled":            "true",
 			},
 			Description:     "Alertmanager for Rancher Monitoring",
 			ExternalID:      templateVersion.ExternalID,

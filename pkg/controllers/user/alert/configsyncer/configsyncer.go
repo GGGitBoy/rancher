@@ -549,10 +549,43 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 			} else if notifier.Spec.DingtalkConfig != nil {
 
-				app.Spec.Answers[webhookProviders+".dingtalk-"+r.NotifierName+".webhook_url"] = notifier.Spec.DingtalkConfig.URL
-				app.Spec.Answers[webhookProviders+".dingtalk-"+r.NotifierName+".secret"] = notifier.Spec.DingtalkConfig.Secret
-				app.Spec.Answers[webhookReceivers+"."+r.NotifierName+".provider"] = "dingtalk-" + r.NotifierName
-				d.apps.Update(app)
+				if app.Spec.Answers["webhook-receiver.enabled"] != "true" {
+					app.Spec.Answers["webhook-receiver.enabled"] = "true"
+					d.apps.Update(app)
+				}
+
+				webhookSecreteName, altermanagerAppNamespace := monitorutil.SecretWebhook()
+				secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
+				configSecret, err := secretClient.Get(webhookSecreteName, metav1.GetOptions{})
+				if err != nil {
+					errors.Wrapf(err, "Get secrets")
+				}
+
+				oldConfig := configSecret.Data["config.yaml"]
+				config := make(map[string]map[string]map[string]string)
+				config["providers"] = make(map[string]map[string]string)
+				config["receivers"] = make(map[string]map[string]string)
+				err = yaml.Unmarshal(oldConfig, &config)
+				if err != nil {
+					errors.Wrapf(err, "yaml Unmarshal config")
+				}
+
+				config["providers"]["dingtalk-"+r.NotifierName] = make(map[string]string)
+				config["receivers"][r.NotifierName] = make(map[string]string)
+				config["providers"]["dingtalk-"+r.NotifierName]["webhook_url"] = notifier.Spec.DingtalkConfig.URL
+				config["providers"]["dingtalk-"+r.NotifierName]["secret"] = notifier.Spec.DingtalkConfig.Secret
+				config["receivers"][r.NotifierName]["provider"] = "dingtalk-" + r.NotifierName
+
+				data, err := yaml.Marshal(config)
+				if err != nil {
+					errors.Wrapf(err, "yaml Marshal config")
+				}
+
+				configSecret.Data["config.yaml"] = data
+				_, err = secretClient.Update(configSecret)
+				if err != nil {
+					errors.Wrapf(err, "Update secrets")
+				}
 
 				webhookURL := "http://webhook-receiver.cattle-prometheus.svc.cluster.local:9094/" + r.NotifierName
 				dingtalk := &alertconfig.WebhookConfig{
@@ -576,9 +609,42 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 			} else if notifier.Spec.MicrosoftConfig != nil {
 
-				app.Spec.Answers[webhookProviders+".microsoft-"+r.NotifierName+".webhook_url"] = notifier.Spec.MicrosoftConfig.URL
-				app.Spec.Answers[webhookReceivers+"."+r.NotifierName+".provider"] = "microsoft-" + r.NotifierName
-				d.apps.Update(app)
+				if app.Spec.Answers["webhook-receiver.enabled"] != "true" {
+					app.Spec.Answers["webhook-receiver.enabled"] = "true"
+					d.apps.Update(app)
+				}
+
+				webhookSecreteName, altermanagerAppNamespace := monitorutil.SecretWebhook()
+				secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
+				configSecret, err := secretClient.Get(webhookSecreteName, metav1.GetOptions{})
+				if err != nil {
+					errors.Wrapf(err, "Get secrets")
+				}
+
+				oldConfig := configSecret.Data["config.yaml"]
+				config := make(map[string]map[string]map[string]string)
+				config["providers"] = make(map[string]map[string]string)
+				config["receivers"] = make(map[string]map[string]string)
+				err = yaml.Unmarshal(oldConfig, &config)
+				if err != nil {
+					errors.Wrapf(err, "yaml Unmarshal config")
+				}
+
+				config["providers"]["microsoft-"+r.NotifierName] = make(map[string]string)
+				config["receivers"][r.NotifierName] = make(map[string]string)
+				config["providers"]["microsoft-"+r.NotifierName]["webhook_url"] = notifier.Spec.MicrosoftConfig.URL
+				config["receivers"][r.NotifierName]["provider"] = "microsoft-" + r.NotifierName
+
+				data, err := yaml.Marshal(config)
+				if err != nil {
+					errors.Wrapf(err, "yaml Marshal config")
+				}
+
+				configSecret.Data["config.yaml"] = data
+				_, err = secretClient.Update(configSecret)
+				if err != nil {
+					errors.Wrapf(err, "Update secrets")
+				}
 
 				webhookURL := "http://webhook-receiver.cattle-prometheus.svc.cluster.local:9094/" + r.NotifierName
 				microsoft := &alertconfig.WebhookConfig{
