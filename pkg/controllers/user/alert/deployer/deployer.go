@@ -285,7 +285,7 @@ func (d *appDeployer) deploy(appName, appTargetNamespace, systemProjectID string
 		return false, fmt.Errorf("create secret %s:%s failed, %v", appTargetNamespace, appName, err)
 	}
 
-	app, err := d.appsLister.Get(systemProjectName, appName)
+	app, err := d.appsGetter.Apps(systemProjectName).Get(appName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, fmt.Errorf("failed to query %q App in %s Project, %v", appName, systemProjectName, err)
 	}
