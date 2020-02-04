@@ -27,6 +27,8 @@ const (
 	NotifierFieldUUID                 = "uuid"
 	NotifierFieldWebhookConfig        = "webhookConfig"
 	NotifierFieldWechatConfig         = "wechatConfig"
+	NotifierFieldDingtalkConfig       = "dingtalkConfig"
+	NotifierFieldMicrosoftConfig      = "microsoftConfig"
 )
 
 type Notifier struct {
@@ -52,6 +54,8 @@ type Notifier struct {
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WebhookConfig        *WebhookConfig    `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
 	WechatConfig         *WechatConfig     `json:"wechatConfig,omitempty" yaml:"wechatConfig,omitempty"`
+	DingtalkConfig       *DingtalkConfig   `json:"dingtalkConfig,omitempty" yaml:"dingtalkConfig,omitempty"`
+	MicrosoftConfig      *MicrosoftConfig  `json:"microsoftConfig,omitempty" yaml:"microsoftConfig,omitempty"`
 }
 
 type NotifierCollection struct {
