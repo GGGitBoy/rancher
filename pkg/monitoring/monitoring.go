@@ -67,6 +67,7 @@ const (
 	RancherMonitoringTemplateName            = "system-library-rancher-monitoring"
 
 	monitoringTemplateName = "rancher-monitoring"
+	webhookSecreteName     = "webhook-receiver"
 )
 
 var (
@@ -156,6 +157,10 @@ func ClusterPrometheusEndpoint() (headlessServiceName, namespace, port string) {
 
 func ProjectPrometheusEndpoint(projectName string) (headlessServiceName, namespace, port string) {
 	return prometheusHeadlessServiceName, fmt.Sprintf("%s-%s", cattleNamespaceName, projectName), "9090"
+}
+
+func SecretWebhook() (secretName, appTargetNamespace string) {
+	return webhookSecreteName, cattleNamespaceName
 }
 
 /*OverwriteAppAnswersAndCatalogID Usage
