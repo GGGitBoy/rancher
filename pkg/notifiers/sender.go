@@ -2,8 +2,10 @@ package notifiers
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,6 +73,14 @@ func SendMessage(notifier *v3.Notifier, recipient string, msg *Message, dialer d
 
 	if notifier.Spec.WebhookConfig != nil {
 		return TestWebhook(notifier.Spec.WebhookConfig.URL, msg.Content, notifier.Spec.WebhookConfig.HTTPClientConfig, dialer)
+	}
+
+	if notifier.Spec.DingtalkConfig != nil {
+		return TestDingtalk(notifier.Spec.DingtalkConfig.URL, notifier.Spec.DingtalkConfig.Secret, msg.Content, notifier.Spec.DingtalkConfig.HTTPClientConfig, dialer)
+	}
+
+	if notifier.Spec.MicrosoftConfig != nil {
+		return TestMicrosoft(notifier.Spec.MicrosoftConfig.URL, msg.Content, notifier.Spec.MicrosoftConfig.HTTPClientConfig, dialer)
 	}
 
 	return errors.New("Notifier not configured")
@@ -229,6 +239,73 @@ func TestWebhook(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer
 	}
 
 	resp, err := post(client, url, contentTypeJSON, bytes.NewBuffer(alertData))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func TestDingtalk(url, secret, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+	if msg == "" {
+		msg = "Dingtalk setting validated"
+	}
+
+	content := `{"msgtype": "text",
+		"text": {"content": "` + msg + `"},
+		"at": {"isAtAll": true}
+	}`
+
+	url = getDingtalkURL(url, secret)
+
+	client, err := NewClientFromConfig(cfg, dialer)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentTypeJSON)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("HTTP status code is %d, not included in the 2xx success HTTP status codes", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func TestMicrosoft(url, msg string, cfg *v3.HTTPClientConfig, dialer dialer.Dialer) error {
+	if msg == "" {
+		msg = "Microsoft setting validated"
+	}
+
+	content := `{"text":"` + msg + `"}`
+
+	client, err := NewClientFromConfig(cfg, dialer)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(content))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentTypeJSON)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -537,4 +614,22 @@ func post(client *http.Client, url string, bodyType string, body io.Reader) (*ht
 	}
 	req.Header.Set("Content-Type", bodyType)
 	return client.Do(req)
+}
+
+func getDingtalkURL(webhook, secret string) string {
+
+	timestamp := time.Now().UnixNano() / 1e6
+
+	stringToSign := fmt.Sprintf("%d\n%s", timestamp, secret)
+
+	key := []byte(secret)
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(stringToSign))
+
+	signData := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	sign := url.QueryEscape(signData)
+
+	webhook = fmt.Sprintf("%s&timestamp=%d&sign=%s", webhook, timestamp, sign)
+
+	return webhook
 }
