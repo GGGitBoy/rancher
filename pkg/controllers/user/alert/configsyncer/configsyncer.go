@@ -117,7 +117,7 @@ func (d *ConfigSyncer) sync() error {
 		return err
 	}
 
-	systemProjectName = project.Name
+	systemProjectName := project.Name
 	isDeployed, err := d.isAppDeploy(systemProjectName)
 	if err != nil {
 		return err
