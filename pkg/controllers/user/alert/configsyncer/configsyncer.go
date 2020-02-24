@@ -35,6 +35,9 @@ var (
 	eventGroupInterval  = 1
 	eventGroupWait      = 1
 	eventRepeatInterval = 525600
+
+	DingTalk  = "dingtalk"
+	MicroSoft = "microsoft"
 )
 
 func NewConfigSyncer(ctx context.Context, cluster *config.UserContext, alertManager *manager.AlertManager, operatorCRDManager *manager.PromOperatorCRDManager) *ConfigSyncer {
@@ -69,6 +72,21 @@ type ConfigSyncer struct {
 	clusterName             string
 	alertManager            *manager.AlertManager
 	operatorCRDManager      *manager.PromOperatorCRDManager
+}
+
+type WebhookReceiverConfig struct {
+	Providers map[string]*Provider `json:"providers" yaml:"providers"`
+	Receivers map[string]*Receiver `json:"receivers" yaml:"receivers"`
+}
+
+type Provider struct {
+	WebHookURL string `json:"webhook_url,omitempty" yaml:"webhook_url,omitempty"`
+	Secret     string `json:"secret,omitempty" yaml:"secret,omitempty"`
+	ProxyURL   string `json:"proxy_url,omitempty" yaml:"proxy_url,omitempty"`
+}
+
+type Receiver struct {
+	Provider string `yaml:"provider"`
 }
 
 func (d *ConfigSyncer) ProjectGroupSync(key string, alert *v3.ProjectAlertGroup) (runtime.Object, error) {
@@ -542,6 +560,42 @@ func (d *ConfigSyncer) addRecipients(notifiers []*v3.Notifier, receiver *alertco
 
 				receiver.WebhookConfigs = append(receiver.WebhookConfigs, webhook)
 				receiverExist = true
+
+			} else if notifier.Spec.DingtalkConfig != nil {
+
+				err := d.syncReceiver(DingTalk, r.NotifierName, notifier.Spec.DingtalkConfig.URL, notifier.Spec.DingtalkConfig.Secret, notifier.Spec.DingtalkConfig.HTTPClientConfig)
+
+				if err != nil {
+					logrus.Errorf("Failed to sync receiver : %v", err)
+					continue
+				}
+
+				webhookURL := "http://webhook-receiver.cattle-prometheus.svc.cluster.local:9094/" + r.NotifierName
+				dingtalk := &alertconfig.WebhookConfig{
+					NotifierConfig: commonNotifierConfig,
+					URL:            webhookURL,
+				}
+
+				receiver.WebhookConfigs = append(receiver.WebhookConfigs, dingtalk)
+				receiverExist = true
+
+			} else if notifier.Spec.MicrosoftConfig != nil {
+				err := d.syncReceiver(MicroSoft, r.NotifierName, notifier.Spec.MicrosoftConfig.URL, "", notifier.Spec.MicrosoftConfig.HTTPClientConfig)
+
+				if err != nil {
+					logrus.Errorf("Failed to sync receiver : %v", err)
+					continue
+				}
+
+				webhookURL := "http://webhook-receiver.cattle-prometheus.svc.cluster.local:9094/" + r.NotifierName
+				microsoft := &alertconfig.WebhookConfig{
+					NotifierConfig: commonNotifierConfig,
+					URL:            webhookURL,
+				}
+
+				receiver.WebhookConfigs = append(receiver.WebhookConfigs, microsoft)
+				receiverExist = true
+
 			} else if notifier.Spec.SlackConfig != nil {
 				slack := &alertconfig.SlackConfig{
 					NotifierConfig: commonNotifierConfig,
@@ -656,4 +710,70 @@ func toAlertManagerURL(urlStr string) (*alertconfig.URL, error) {
 		return nil, err
 	}
 	return &alertconfig.URL{URL: url}, nil
+}
+
+func (d *ConfigSyncer) syncReceiver(notifierType, notifierName, url, secret string, HTTPClientConfig *v3.HTTPClientConfig) error {
+	appName, _ := monitorutil.ClusterAlertManagerInfo()
+
+	project, err := project.GetSystemProject(d.clusterName, d.projectLister)
+	if err != nil {
+		return errors.Wrapf(err, "Get system project")
+	}
+
+	app, err := d.appLister.Get(project.Name, appName)
+	if err != nil {
+		return errors.Wrapf(err, "Get app")
+	}
+
+	if app.Spec.Answers["webhook-receiver.enabled"] != "true" {
+		app.Spec.Answers["webhook-receiver.enabled"] = "true"
+		_, err = d.apps.Update(app)
+		if err != nil {
+			return errors.Wrapf(err, "Update app %s", appName)
+		}
+	}
+
+	webhookSecreteName, altermanagerAppNamespace := monitorutil.SecretWebhook()
+	secretClient := d.secretsGetter.Secrets(altermanagerAppNamespace)
+	configSecret, err := secretClient.Get(webhookSecreteName, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "Get secret")
+	}
+	oldConfig := configSecret.Data["config.yaml"]
+
+	config := WebhookReceiverConfig{
+		Providers: make(map[string]*Provider),
+		Receivers: make(map[string]*Receiver),
+	}
+
+	err = yaml.Unmarshal(oldConfig, &config)
+	if err != nil {
+		logrus.Errorf("Error yaml Unmarshal config : %v", err)
+	}
+
+	config.Providers[notifierType+"-"+notifierName] = &Provider{
+		WebHookURL: url,
+		Secret:     secret,
+	}
+
+	if HTTPClientConfig != nil {
+		config.Providers[notifierType+"-"+notifierName].ProxyURL = HTTPClientConfig.ProxyURL
+	}
+
+	config.Receivers[notifierName] = &Receiver{
+		Provider: notifierType + "-" + notifierName,
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		logrus.Errorf("Error yaml Marshal config : %v", err)
+	}
+
+	configSecret.Data["config.yaml"] = data
+	_, err = secretClient.Update(configSecret)
+	if err != nil {
+		return errors.Wrapf(err, "Update secret")
+	}
+
+	return nil
 }
