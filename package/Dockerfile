@@ -135,7 +135,7 @@ ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSIO
 ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
 ARG VERSION=dev
-ENV CATTLE_SERVER_VERSION ${VERSION}
+ENV CATTLE_SERVER_VERSION dev
 COPY entrypoint.sh rancher /usr/bin/
 COPY kustomize.sh /usr/bin/
 COPY jailer.sh /usr/bin/
