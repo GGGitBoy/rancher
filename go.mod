@@ -9,8 +9,8 @@ replace (
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20190404221404-ee5226d43009
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.3
-
 	github.com/rancher/rancher/pkg/auth => ./pkg/auth
+	github.com/rancher/types => github.com/GGGitBoy/types v0.0.0-20200710024838-b539e7f6b285
 
 	k8s.io/api => k8s.io/api v0.18.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.18.0
@@ -71,6 +71,7 @@ require (
 	github.com/prometheus/common v0.9.1
 	github.com/rancher/apiserver v0.0.0-20200612212259-10457317eb0b
 	github.com/rancher/dynamiclistener v0.2.1-0.20200418023342-52ede5ec9234
+	github.com/rancher/kontainer-driver-metadata v0.0.0-20200617182744-bad9c1ce0eba
 	github.com/rancher/kontainer-engine v0.0.4-dev.0.20200508010131-226462dc5558
 	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
 	github.com/rancher/machine v0.15.0-rancher25

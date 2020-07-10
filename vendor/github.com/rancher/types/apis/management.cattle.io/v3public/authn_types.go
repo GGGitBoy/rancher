@@ -12,6 +12,7 @@ type AuthProvider struct {
 }
 
 type GenericLogin struct {
+	Captcha      string `json:"captcha"`
 	TTLMillis    int64  `json:"ttl,omitempty"`
 	Description  string `json:"description,omitempty" norman:"type=string,required"`
 	ResponseType string `json:"responseType,omitempty" norman:"type=string,required"` //json or cookie
@@ -122,4 +123,5 @@ type SamlLoginInput struct {
 
 type SamlLoginOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
+	EnabledMfa     bool   `json:"enabledMfa"`
 }

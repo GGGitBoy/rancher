@@ -27,6 +27,7 @@ type Token struct {
 	Current         bool              `json:"current"`
 	ClusterName     string            `json:"clusterName,omitempty" norman:"noupdate,type=reference[cluster]"`
 	Enabled         *bool             `json:"enabled,omitempty" norman:"default=true"`
+	EnabledMfa      bool              `json:"enabledMfa"`
 }
 
 func (t *Token) ObjClusterName() string {
@@ -45,6 +46,8 @@ type User struct {
 	Description        string     `json:"description"`
 	Username           string     `json:"username,omitempty"`
 	Password           string     `json:"password,omitempty" norman:"writeOnly,noupdate"`
+	MfaSecret          string     `json:"mfaSecret,omitempty" norman:"writeOnly,noupdate"`
+	MfaStatus          bool       `json:"mfaStatus,omitempty"`
 	MustChangePassword bool       `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string   `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
 	Me                 bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
@@ -127,6 +130,11 @@ type SearchPrincipalsInput struct {
 type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword" norman:"type=string,required"`
 	NewPassword     string `json:"newPassword" norman:"type=string,required"`
+}
+
+type ChangeMfaInput struct {
+	Secret  string `json:"secret" norman:"type=string,required"`
+	Captcha string `json:"captcha" norman:"type=string,required"`
 }
 
 type SetPasswordInput struct {

@@ -442,17 +442,24 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.SearchPrincipalsInput{}).
 		MustImport(&Version, v3.ChangePasswordInput{}).
 		MustImport(&Version, v3.SetPasswordInput{}).
+		MustImport(&Version, v3.ChangeMfaInput{}).
 		MustImportAndCustomize(&Version, v3.User{}, func(schema *types.Schema) {
 			schema.ResourceActions = map[string]types.Action{
 				"setpassword": {
 					Input:  "setPasswordInput",
 					Output: "user",
 				},
+				"setmfa": {
+					Input: "changeMfaInput",
+				},
 				"refreshauthprovideraccess": {},
 			}
 			schema.CollectionActions = map[string]types.Action{
 				"changepassword": {
 					Input: "changePasswordInput",
+				},
+				"changemfa": {
+					Input: "changeMfaInput",
 				},
 				"refreshauthprovideraccess": {},
 			}

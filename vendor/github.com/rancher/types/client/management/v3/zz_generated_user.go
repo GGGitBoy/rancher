@@ -14,6 +14,8 @@ const (
 	UserFieldEnabled              = "enabled"
 	UserFieldLabels               = "labels"
 	UserFieldMe                   = "me"
+	UserFieldMfaSecret            = "mfaSecret"
+	UserFieldMfaStatus            = "mfaStatus"
 	UserFieldMustChangePassword   = "mustChangePassword"
 	UserFieldName                 = "name"
 	UserFieldOwnerReferences      = "ownerReferences"
@@ -37,6 +39,8 @@ type User struct {
 	Enabled              *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Me                   bool              `json:"me,omitempty" yaml:"me,omitempty"`
+	MfaSecret            string            `json:"mfaSecret,omitempty" yaml:"mfaSecret,omitempty"`
+	MfaStatus            bool              `json:"mfaStatus,omitempty" yaml:"mfaStatus,omitempty"`
 	MustChangePassword   bool              `json:"mustChangePassword,omitempty" yaml:"mustChangePassword,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences      []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
@@ -71,7 +75,11 @@ type UserOperations interface {
 
 	ActionRefreshauthprovideraccess(resource *User) error
 
+	ActionSetmfa(resource *User, input *ChangeMfaInput) error
+
 	ActionSetpassword(resource *User, input *SetPasswordInput) (*User, error)
+
+	CollectionActionChangemfa(resource *UserCollection, input *ChangeMfaInput) error
 
 	CollectionActionChangepassword(resource *UserCollection, input *ChangePasswordInput) error
 
@@ -152,10 +160,20 @@ func (c *UserClient) ActionRefreshauthprovideraccess(resource *User) error {
 	return err
 }
 
+func (c *UserClient) ActionSetmfa(resource *User, input *ChangeMfaInput) error {
+	err := c.apiClient.Ops.DoAction(UserType, "setmfa", &resource.Resource, input, nil)
+	return err
+}
+
 func (c *UserClient) ActionSetpassword(resource *User, input *SetPasswordInput) (*User, error) {
 	resp := &User{}
 	err := c.apiClient.Ops.DoAction(UserType, "setpassword", &resource.Resource, input, resp)
 	return resp, err
+}
+
+func (c *UserClient) CollectionActionChangemfa(resource *UserCollection, input *ChangeMfaInput) error {
+	err := c.apiClient.Ops.DoCollectionAction(UserType, "changemfa", &resource.Collection, input, nil)
+	return err
 }
 
 func (c *UserClient) CollectionActionChangepassword(resource *UserCollection, input *ChangePasswordInput) error {

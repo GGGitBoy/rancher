@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/parse"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	v3 "github.com/rancher/types/apis/management.cattle.io/v3"
 	client "github.com/rancher/types/client/management/v3"
@@ -18,6 +19,7 @@ import (
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpassword")
+	resource.AddAction(apiContext, "setmfa")
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
 	}
@@ -25,6 +27,7 @@ func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.Ra
 
 func (h *Handler) CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
 	collection.AddAction(apiContext, "changepassword")
+	collection.AddAction(apiContext, "changemfa")
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		collection.AddAction(apiContext, "refreshauthprovideraccess")
 	}
@@ -50,6 +53,14 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 		if err := h.refreshAttributes(actionName, action, apiContext); err != nil {
 			return err
 		}
+	case "changemfa":
+		if err := h.enableMfa(actionName, action, apiContext); err != nil {
+			return err
+		}
+	case "setmfa":
+		if err := h.setMfa(actionName, action, apiContext); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("bad action %v", actionName)
 	}
@@ -59,6 +70,94 @@ func (h *Handler) Actions(actionName string, action *types.Action, apiContext *t
 			return err
 		}
 	}
+	return nil
+}
+
+func (h *Handler) setMfa(actionName string, action *types.Action, request *types.APIContext) error {
+	actionInput, err := parse.ReadBody(request.Request)
+	if err != nil {
+		return err
+	}
+
+	store := request.Schema.Store
+	if store == nil {
+		return errors.New("no user store available")
+	}
+
+	userData, err := store.ByID(request, request.Schema, request.ID)
+	if err != nil {
+		return err
+	}
+
+	secret, ok := actionInput["secret"].(string)
+	if !ok || len(secret) == 0 {
+		return errors.New("Invalid secret")
+	}
+
+	userData["mfaSecret"] = secret
+	delete(userData, "me")
+
+	_, err = store.Update(request, request.Schema, userData, request.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *Handler) enableMfa(actionName string, action *types.Action, request *types.APIContext) error {
+
+	actionInput, err := parse.ReadBody(request.Request)
+	if err != nil {
+		return err
+	}
+
+	store := request.Schema.Store
+	if store == nil {
+		return errors.New("no user store available")
+	}
+
+	userID := request.Request.Header.Get("Impersonate-User")
+	if userID == "" {
+		return errors.New("can't find user")
+	}
+
+	user, err := h.UserClient.Get(userID, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	code, ok := actionInput["code"].(string)
+	if !ok || len(code) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must specify current code")
+	}
+
+	if user.MfaStatus {
+		if !providers.VerifyCode(user.MfaSecret, code, 1) {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "验证码匹配失败")
+		}
+
+		user.MfaSecret = ""
+		user.MfaStatus = false
+	} else {
+		secret, ok := actionInput["secret"].(string)
+		if !ok {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "must specify current secret")
+		}
+
+		if !providers.VerifyCode(secret, code, 1) {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "验证码匹配失败")
+		}
+
+		user.MfaSecret = secret
+		user.MfaStatus = true
+	}
+
+	user, err = h.UserClient.Update(user)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

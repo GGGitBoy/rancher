@@ -46,10 +46,6 @@ type loginHandler struct {
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
-	if actionName != "login" {
-		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
-	}
-
 	w := request.Response
 
 	token, responseType, err := h.createLoginToken(request)
@@ -72,6 +68,8 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 		}
 		http.SetCookie(w, tokenCookie)
 	} else if responseType == "saml" {
+		return nil
+	} else if responseType == "mfa" {
 		return nil
 	} else {
 		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
@@ -106,6 +104,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	responseType := generic.ResponseType
 	description := generic.Description
 	ttl := generic.TTLMillis
+	captcha := generic.Captcha
 
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
@@ -188,6 +187,21 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	if user.Enabled != nil && !*user.Enabled {
 		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+	}
+
+	if user.MfaStatus {
+		if captcha != "" {
+			if !providers.VerifyCode(user.MfaSecret, captcha, 1) {
+				return v3.Token{}, "mfa", httperror.NewAPIError(httperror.InvalidBodyContent, "验证码匹配失败")
+			}
+		} else {
+			data := map[string]interface{}{
+				"mfa":  user.MfaStatus,
+				"type": "token",
+			}
+			request.WriteResponse(http.StatusOK, data)
+			return v3.Token{}, "mfa", nil
+		}
 	}
 
 	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)

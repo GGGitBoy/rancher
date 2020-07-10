@@ -10,6 +10,7 @@ const (
 	TokenFieldCurrent         = "current"
 	TokenFieldDescription     = "description"
 	TokenFieldEnabled         = "enabled"
+	TokenFieldEnabledMfa      = "enabledMfa"
 	TokenFieldExpired         = "expired"
 	TokenFieldExpiresAt       = "expiresAt"
 	TokenFieldGroupPrincipals = "groupPrincipals"
@@ -36,6 +37,7 @@ type Token struct {
 	Current         bool              `json:"current,omitempty" yaml:"current,omitempty"`
 	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Enabled         *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EnabledMfa      bool              `json:"enabledMfa,omitempty" yaml:"enabledMfa,omitempty"`
 	Expired         bool              `json:"expired,omitempty" yaml:"expired,omitempty"`
 	ExpiresAt       string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
 	GroupPrincipals []string          `json:"groupPrincipals,omitempty" yaml:"groupPrincipals,omitempty"`

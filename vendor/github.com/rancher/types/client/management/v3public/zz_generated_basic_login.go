@@ -2,6 +2,7 @@ package client
 
 const (
 	BasicLoginType              = "basicLogin"
+	BasicLoginFieldCaptcha      = "captcha"
 	BasicLoginFieldDescription  = "description"
 	BasicLoginFieldPassword     = "password"
 	BasicLoginFieldResponseType = "responseType"
@@ -10,6 +11,7 @@ const (
 )
 
 type BasicLogin struct {
+	Captcha      string `json:"captcha,omitempty" yaml:"captcha,omitempty"`
 	Description  string `json:"description,omitempty" yaml:"description,omitempty"`
 	Password     string `json:"password,omitempty" yaml:"password,omitempty"`
 	ResponseType string `json:"responseType,omitempty" yaml:"responseType,omitempty"`

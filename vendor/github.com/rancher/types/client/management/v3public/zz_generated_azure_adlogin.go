@@ -2,6 +2,7 @@ package client
 
 const (
 	AzureADLoginType              = "azureADLogin"
+	AzureADLoginFieldCaptcha      = "captcha"
 	AzureADLoginFieldCode         = "code"
 	AzureADLoginFieldDescription  = "description"
 	AzureADLoginFieldResponseType = "responseType"
@@ -9,6 +10,7 @@ const (
 )
 
 type AzureADLogin struct {
+	Captcha      string `json:"captcha,omitempty" yaml:"captcha,omitempty"`
 	Code         string `json:"code,omitempty" yaml:"code,omitempty"`
 	Description  string `json:"description,omitempty" yaml:"description,omitempty"`
 	ResponseType string `json:"responseType,omitempty" yaml:"responseType,omitempty"`
