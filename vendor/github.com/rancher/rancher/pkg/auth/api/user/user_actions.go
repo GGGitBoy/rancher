@@ -89,12 +89,18 @@ func (h *Handler) setMfa(actionName string, action *types.Action, request *types
 		return err
 	}
 
-	secret, ok := actionInput["secret"].(string)
-	if !ok || len(secret) == 0 {
-		return errors.New("Invalid secret")
+	if userData["mfaStatus"].(bool) {
+		userData["mfaSecret"] = ""
+		userData["mfaStatus"] = false
+	} else {
+		secret, ok := actionInput["secret"].(string)
+		if !ok || len(secret) == 0 {
+			return errors.New("Invalid secret")
+		}
+		userData["mfaSecret"] = secret
+		userData["mfaStatus"] = true
 	}
 
-	userData["mfaSecret"] = secret
 	delete(userData, "me")
 
 	_, err = store.Update(request, request.Schema, userData, request.ID)
@@ -127,13 +133,13 @@ func (h *Handler) enableMfa(actionName string, action *types.Action, request *ty
 		return err
 	}
 
-	code, ok := actionInput["code"].(string)
-	if !ok || len(code) == 0 {
+	captcha, ok := actionInput["captcha"].(string)
+	if !ok || len(captcha) == 0 {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must specify current code")
 	}
 
 	if user.MfaStatus {
-		if !providers.VerifyCode(user.MfaSecret, code, 1) {
+		if !providers.VerifyCode(user.MfaSecret, captcha, 1) {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "验证码匹配失败")
 		}
 
@@ -145,7 +151,7 @@ func (h *Handler) enableMfa(actionName string, action *types.Action, request *ty
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "must specify current secret")
 		}
 
-		if !providers.VerifyCode(secret, code, 1) {
+		if !providers.VerifyCode(secret, captcha, 1) {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "验证码匹配失败")
 		}
 

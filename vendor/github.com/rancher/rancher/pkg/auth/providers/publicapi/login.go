@@ -37,15 +37,27 @@ func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHand
 	return &loginHandler{
 		userMGR:  mgmt.UserManager,
 		tokenMGR: tokens.NewManager(ctx, mgmt),
+		lmt:      newIPRateLimiter(),
+		amt:      newAuthLimiter(),
 	}
 }
 
 type loginHandler struct {
 	userMGR  user.Manager
 	tokenMGR *tokens.Manager
+	lmt      *IPRateLimiter
+	amt      *AuthLimiter
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
+	if actionName != "login" {
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
+	}
+
+	if err := h.lmt.LimitByRequest(request); err != nil {
+		return err
+	}
+
 	w := request.Response
 
 	token, responseType, err := h.createLoginToken(request)
@@ -170,9 +182,19 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "saml", err
 	}
 
+	bLogin, isLocalProvider := input.(*v3public.BasicLogin)
+	if isLocalProvider {
+		if err = h.amt.LimitByUser(bLogin.Username, request); err != nil {
+			return v3.Token{}, "", err
+		}
+	}
+
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
 	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
+		if isLocalProvider {
+			h.amt.MarkFailure(bLogin.Username, request)
+		}
 		return v3.Token{}, "", err
 	}
 
@@ -192,12 +214,15 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	if user.MfaStatus {
 		if captcha != "" {
 			if !providers.VerifyCode(user.MfaSecret, captcha, 1) {
+				if isLocalProvider {
+					h.amt.MarkFailure(bLogin.Username, request)
+				}
 				return v3.Token{}, "mfa", httperror.NewAPIError(httperror.InvalidBodyContent, "验证码匹配失败")
 			}
 		} else {
 			data := map[string]interface{}{
-				"mfa":  user.MfaStatus,
-				"type": "token",
+				"enabledMfa": user.MfaStatus,
+				"type":       "token",
 			}
 			request.WriteResponse(http.StatusOK, data)
 			return v3.Token{}, "mfa", nil

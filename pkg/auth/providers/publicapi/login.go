@@ -37,17 +37,25 @@ func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHand
 	return &loginHandler{
 		userMGR:  mgmt.UserManager,
 		tokenMGR: tokens.NewManager(ctx, mgmt),
+		lmt:      newIPRateLimiter(),
+		amt:      newAuthLimiter(),
 	}
 }
 
 type loginHandler struct {
 	userMGR  user.Manager
 	tokenMGR *tokens.Manager
+	lmt      *IPRateLimiter
+	amt      *AuthLimiter
 }
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
 	if actionName != "login" {
 		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
+	}
+
+	if err := h.lmt.LimitByRequest(request); err != nil {
+		return err
 	}
 
 	w := request.Response
@@ -72,6 +80,8 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 		}
 		http.SetCookie(w, tokenCookie)
 	} else if responseType == "saml" {
+		return nil
+	} else if responseType == "mfa" {
 		return nil
 	} else {
 		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
@@ -106,6 +116,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	responseType := generic.ResponseType
 	description := generic.Description
 	ttl := generic.TTLMillis
+	captcha := generic.Captcha
 
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
@@ -171,9 +182,19 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return v3.Token{}, "saml", err
 	}
 
+	bLogin, isLocalProvider := input.(*v3public.BasicLogin)
+	if isLocalProvider {
+		if err = h.amt.LimitByUser(bLogin.Username, request); err != nil {
+			return v3.Token{}, "", err
+		}
+	}
+
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
 	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
+		if isLocalProvider {
+			h.amt.MarkFailure(bLogin.Username, request)
+		}
 		return v3.Token{}, "", err
 	}
 
@@ -188,6 +209,24 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 
 	if user.Enabled != nil && !*user.Enabled {
 		return v3.Token{}, "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+	}
+
+	if user.MfaStatus {
+		if captcha != "" {
+			if !providers.VerifyCode(user.MfaSecret, captcha, 1) {
+				if isLocalProvider {
+					h.amt.MarkFailure(bLogin.Username, request)
+				}
+				return v3.Token{}, "mfa", httperror.NewAPIError(httperror.InvalidBodyContent, "verification code matching failed")
+			}
+		} else {
+			data := map[string]interface{}{
+				"enabledMfa": user.MfaStatus,
+				"type":       "token",
+			}
+			request.WriteResponse(http.StatusOK, data)
+			return v3.Token{}, "mfa", nil
+		}
 	}
 
 	rToken, err := h.tokenMGR.NewLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
