@@ -119,6 +119,10 @@ func getConfig(client *http.Client, url string, header http.Header) (*rkeworker.
 	}
 
 	for k, v := range header {
+		fmt.Println("JIANDO HEADER: KEY: " + k)
+		for _, value := range v {
+			fmt.Println("JIANDO HEADER: VALUE: " + value)
+		}
 		req.Header[k] = v
 	}
 
